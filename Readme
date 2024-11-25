@@ -1,7 +1,7 @@
 ```markdown
 # 🏢 Dubai Real Estate Market Dashboard: Your Comprehensive Tool for Real-Time Insights 📈
 
-![Dubai Real Estate Hero](https://drive.google.com/file/d/1hh4HqxgyZmP_5R-bpoUsuCXkpN80fe2A/view?usp=drive_link)
+![Dubai Real Estate Hero](images/dashboard.png)
 
 ## Table of Contents
 
@@ -40,7 +40,7 @@ Leveraging the capabilities of **Streamlit**, **Plotly**, and advanced data proc
 
 ## Demo
 
-![Dashboard Screenshot](https://drive.google.com/file/d/1hh4HqxgyZmP_5R-bpoUsuCXkpN80fe2A/view?usp=drive_link)
+![Dashboard Screenshot](images/dashboard.png)
 
 *Experience the power of real-time insights at your fingertips!*
 
@@ -189,7 +189,7 @@ To ensure your dashboard reflects the latest data from the Dubai Land Department
 
    On the sidebar, choose between loading data from **CSV Files** or via **API**.
 
-   ![Data Source Selection](https://drive.google.com/file/d/11ha_4szOLBk8OmcwaJryf4zp3GFNwss5/view?usp=drive_link)
+   ![Data Source Selection](images/sidepanel.png)
 
 2. **Load Data**
 
@@ -341,10 +341,12 @@ Utilizing advanced visualization tools, the dashboard brings data to life throug
 - **Dynamic Filters:** Customize views based on area, property type, and other relevant parameters.
 - **Comprehensive Graphs:** Employ a variety of chart types including bar charts, line graphs, scatter plots, histograms, pie charts, box plots, and heatmaps to effectively represent data.
 
-![Interactive Charts](https://drive.google.com/file/d/1n_uWzyq3nIiR_XfYExx0xS8uyLp5-0yi/view?usp=drive_link)
-![Interactive Charts](https://drive.google.com/file/d/1KZ9OvelP40ERA4ol2SnuuY-FqO2cSJkX/view?usp=drive_link)
-![Interactive Charts](https://drive.google.com/file/d/1Q9H3NVDXxDR8HgejUOSVsFnj4MmziJOk/view?usp=drive_link)
-![Interactive Charts](https://drive.google.com/file/d/1NFAg1dggZ9KfKVuALoL9X4_NzQ4ffvxv/view?usp=drive_link)
+![Interactive Charts](images/chart1.png)
+![Interactive Charts](images/chart2.png)
+![Interactive Charts](images/chart3.png)
+![Interactive Charts](images/chart4.png)
+![Interactive Charts](images/chart5.png)
+
 
 *Observe how data transforms into insightful visualizations!*
 
