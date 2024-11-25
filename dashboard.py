@@ -68,12 +68,12 @@ def load_data(source='CSV'):
             os.makedirs('data', exist_ok=True)
 
             # Define Google Drive file IDs
+            
             transactions_file_id = '1FkX2cPwvEPVZue72vEJigvFBMf-XyypG'  # Replace with your actual file ID
             rent_file_id = '1d0TNyG46PwunJm1kuWhP93eQhB8eCX04'  # Replace with your actual file ID
-
             # Define URLs for downloading
-            transactions_url = f'https://drive.google.com/uc?id={transactions_file_id}'
             rent_url = f'https://drive.google.com/uc?id={rent_file_id}'
+            transactions_url = f'https://drive.google.com/uc?id={transactions_file_id}'
 
             # Download the transactions CSV
             transactions_path = 'data/transactions-2024-11-23.csv'
