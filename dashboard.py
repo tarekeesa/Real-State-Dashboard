@@ -10,7 +10,7 @@ import gdown
 import os
 
 from datapipeline.feature_engineering import perform_feature_engineering
-from datapipeline.cleaning import clean_and_detect_outliers, impute_missing_values
+from datapipeline.cleaning import clean_and_detect_outliers
 from datapipeline.index_calculation import (
     calculate_gross_yield, 
     calculate_gross_yield_per_sqft, 
@@ -24,7 +24,7 @@ from datapipeline.index_calculation import (
 )
 # from datapipeline.reporting import export_indexes_to_csv
 # from datapipeline.visualization import visualize_gross_yield, visualize_gross_yield_interactive, plot_gross_yield_interactive
-from datapipeline.utils import load_data_from_api, identify_off_market, identify_distressed, detect_outliers_iqr, get_column_case_insensitive
+from datapipeline.utils import load_data_from_api, identify_off_market, identify_distressed, detect_outliers_iqr, get_column_case_insensitive, standardize_column_names
 
 
 # Configure logging
@@ -46,7 +46,7 @@ st.set_page_config(
 # -----------------------------
 
 st.sidebar.header("Data Source Selection")
-data_source = st.sidebar.selectbox("Select Data Source", ["Select Data Source", "CSV Files", "API"])
+data_source = st.sidebar.selectbox("Select Data Source", ["Select Data Source", "Parquet", "API"])
 
 # Check if a valid data source is selected
 if data_source == "Select Data Source":
@@ -59,55 +59,50 @@ if data_source == "Select Data Source":
 # https://drive.google.com/file/d/1d0TNyG46PwunJm1kuWhP93eQhB8eCX04/view?usp=sharing
 # https://drive.google.com/file/d/1FkX2cPwvEPVZue72vEJigvFBMf-XyypG/view?usp=sharing
 
-@st.cache_data(show_spinner=False, ttl=3600)  # Cache data for 1 hour
-def load_data(source='CSV'):
+@st.cache_data(show_spinner=False, ttl=3600, max_entries=10)
+def load_data(source='Parquet'):
     logger.info(f"Loading data from {source}")
-    if source == 'CSV Files':
+    if source == 'Parquet':
         try:
             # Ensure the 'data' directory exists
             os.makedirs('data', exist_ok=True)
-
             # Define Google Drive file IDs
-            
-            transactions_file_id = '1FkX2cPwvEPVZue72vEJigvFBMf-XyypG'  # Replace with your actual file ID
-            rent_file_id = '1d0TNyG46PwunJm1kuWhP93eQhB8eCX04'  # Replace with your actual file ID
+            transactions_file_id = '1XJjPp-lx1FxqA42s00DUGVYoKSYlScUQ'  # Replace with your actual file ID
+            rent_file_id = '1SPChtZdbI9jTbavdneAcaJtVTjmoW4rm'  # Replace with your actual file ID
+
             # Define URLs for downloading
-            rent_url = f'https://drive.google.com/uc?id={rent_file_id}'
             transactions_url = f'https://drive.google.com/uc?id={transactions_file_id}'
+            rent_url = f'https://drive.google.com/uc?id={rent_file_id}'
 
-            # Download the transactions CSV
-            transactions_path = 'data/transactions-2024-11-23.csv'
-            if not os.path.exists(transactions_path):
-                logger.info("Downloading transactions CSV from Google Drive...")
-                gdown.download(transactions_url, transactions_path, quiet=False)
-            else:
-                logger.info("Transactions CSV already exists. Skipping download.")
-
-            # Download the rent CSV
-            rent_path = 'data/rent.csv'
+            #  Download the rent Parquet
+            rent_path = 'data/rent.parquet'
             if not os.path.exists(rent_path):
-                logger.info("Downloading rent CSV from Google Drive...")
+                logger.info("Downloading rent Parquet from Google Drive...")
                 gdown.download(rent_url, rent_path, quiet=False)
             else:
-                logger.info("Rent CSV already exists. Skipping download.")
+                logger.info("Rent Parquet already exists. Skipping download.")
 
-            # Read the downloaded CSV files
-            transactions = pd.read_csv(
-                transactions_path,
-                on_bad_lines='skip',
-                low_memory=False,
-                parse_dates=['INSTANCE_DATE']
-            )
-            rent = pd.read_csv(
-                rent_path,
-                on_bad_lines='skip',
-                low_memory=False,
-                parse_dates=['REGISTRATION_DATE', 'START_DATE', 'END_DATE']
-            )
-            logger.info("Data loaded successfully from Google Drive CSVs")
+            # Download the transactions Parquet
+            transactions_path = 'data/transactions.parquet'
+            if not os.path.exists(transactions_path):
+                logger.info("Downloading transactions Parquet from Google Drive...")
+                gdown.download(transactions_url, transactions_path, quiet=False)
+            else:
+                logger.info("Transactions Parquet already exists. Skipping download.")
+
+            # Read the downloaded Parquet files
+            rent = pd.read_parquet(rent_path)
+            transactions = pd.read_parquet(transactions_path)
+
+            # Standardize column names
+            transactions = standardize_column_names(transactions)
+            rent = standardize_column_names(rent)
+            logger.info("Standardized column names to uppercase with underscores")
+
+            logger.info("Data loaded successfully from Google Drive Parquet files")
         except Exception as e:
-            logger.error(f"Error loading CSV data from Google Drive: {e}")
-            st.error("Failed to load data from Google Drive CSV files. Please check the logs for more details.")
+            logger.error(f"Error loading Parquet data from Google Drive: {e}")
+            st.error("Failed to load data from Google Drive Parquet files. Please check the logs for more details.")
             transactions = pd.DataFrame()
             rent = pd.DataFrame()
     elif source == 'API':
@@ -118,13 +113,18 @@ def load_data(source='CSV'):
         transactions = pd.DataFrame()
         rent = pd.DataFrame()
     
+    # **Debugging Step:** Log standardized column names
+    logger.info(f"Transactions DataFrame Columns (Standardized): {transactions.columns.tolist()}")
+    logger.info(f"Rent DataFrame Columns (Standardized): {rent.columns.tolist()}")
+
     # Standardize column names: strip whitespace only
     if not transactions.empty:
         transactions.columns = transactions.columns.str.strip()
     if not rent.empty:
         rent.columns = rent.columns.str.strip()
     
-    return transactions, rent 
+    return transactions, rent
+
 
 # -----------------------------
 # Load Data Based on Selection
@@ -197,31 +197,6 @@ def calculate_all_indexes_cached(transactions, rent):
     }
 
 processed_data = calculate_all_indexes_cached(transactions_df, rent_df)
-
-# -----------------------------
-# Reporting and Exporting
-# -----------------------------
-
-@st.cache_data(show_spinner=False)
-def prepare_and_export_data_cached(processed_data_dict, strategy='median'):
-    logger.info("Preparing and exporting data")
-    prepared_data = {}
-    for name, df in processed_data_dict.items():
-        # Impute missing values if strategy is specified
-        if strategy:
-            df_prepared = impute_missing_values(df, strategy=strategy)
-        else:
-            df_prepared = df
-
-        prepared_data[name] = df_prepared
-
-    return prepared_data
-
-prepared_data = prepare_and_export_data_cached(processed_data, strategy='median')
-
-# **Remove the `create_download_buttons` function call to prevent duplication**
-# Comment out or remove the following line:
-# create_download_buttons(prepared_data)
 
 # -----------------------------
 # Streamlit Dashboard Layout
@@ -1219,6 +1194,15 @@ with tabs[6]:
     total_trans_outliers = sum(trans_outliers.values())
     total_rent_outliers = sum(rent_outliers.values())
 
+
+    # Prevent division by zero by checking if len(trans_outliers) > 0
+    if len(trans_outliers) > 0 and total_transactions > 0:
+        trans_outlier_percent = (total_trans_outliers / (total_transactions * len(trans_outliers))) * 100
+    else:
+        trans_outlier_percent = 0
+        logger.warning("Division by zero encountered while calculating trans_outlier_percent. Set to 0.")
+
+
     # Calculate percentages
     trans_outlier_percent = (total_trans_outliers / (total_transactions * len(trans_outliers))) * 100
     rent_outlier_percent = (total_rent_outliers / (total_rent * len(rent_outliers))) * 100
@@ -1463,16 +1447,16 @@ with tabs[7]:
     st.markdown("---")
     
     # Download Processed Data
-    st.subheader('💾 Download Processed Data')
-    for name, df in prepared_data.items():
-        csv = df.to_csv(index=False).encode('utf-8')
-        st.download_button(
-            label=f'Download {name}',
-            data=csv,
-            file_name=f'{name.replace(" ", "_").lower()}.csv',
-            mime='text/csv',
-            key=f'download_processed_{name}'  # Unique key
-        )
+st.subheader('💾 Download Processed Data')
+for name, df in processed_data.items():
+    csv = df.to_csv(index=False).encode('utf-8')
+    st.download_button(
+        label=f'Download {name}',
+        data=csv,
+        file_name=f'{name.replace(" ", "_").lower()}.csv',
+        mime='text/csv',
+        key=f'download_processed_{name}'  # Unique key
+    )
     
     st.markdown("---")
 

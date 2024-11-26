@@ -86,6 +86,8 @@ def calculate_rent_vs_sales_supply_index(rent_supply_index, sales_supply_index):
 
     # Calculate Rent vs Sales Supply Index
     rent_vs_sales['Rent_vs_Sales_Supply_Index'] = rent_vs_sales['Properties_Listed_For_Rent'] / rent_vs_sales['Properties_Listed_For_Sale']
+    rent_vs_sales['Rent_vs_Sales_Supply_Index'].replace([np.inf, -np.inf], np.nan, inplace=True)
+    rent_vs_sales['Rent_vs_Sales_Supply_Index'].fillna(0, inplace=True)
     logger.info("Calculated Rent vs Sales Supply Index")
 
     return rent_vs_sales

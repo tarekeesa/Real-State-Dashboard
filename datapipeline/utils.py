@@ -1,24 +1,33 @@
+# datapipeline/utils.py
+
 import pandas as pd
-import streamlit as st
+import numpy as np
 import logging
+import streamlit as st
 import requests
 
 logger = logging.getLogger(__name__)
 
-@st.cache_data(show_spinner=False, ttl=3600)
 def validate_data(df, columns):
     """
     Validates that specified columns in the DataFrame have no zero or negative values.
+    Drops rows where invalid values are found.
     """
     for col in columns:
-        invalid_count = (df[col] <= 0).sum()
-        if invalid_count > 0:
-            st.warning(f"Data Validation Warning: {col} contains zero or negative values. These rows will be excluded.")
-            df = df[df[col] > 0]
-            logger.info(f"Excluded {invalid_count} rows with non-positive values in '{col}'")
+        actual_col = get_column_case_insensitive(df, col)
+        if actual_col:
+            invalid_count = (df[actual_col] <= 0).sum()
+            if invalid_count > 0:
+                # st.warning(f"Data Validation Warning: {actual_col} contains {invalid_count} zero or negative values. These rows will be excluded.")
+                df = df[df[actual_col] > 0]
+                logger.info(f"Excluded {invalid_count} rows with non-positive values in '{actual_col}'")
+        else:
+            st.warning(f"Data Validation Warning: Column '{col}' not found in DataFrame. Skipping validation for this column.")
+            logger.warning(f"Column '{col}' not found in DataFrame.")
     return df
 
-@st.cache_data(show_spinner=False, ttl=3600) 
+
+
 def detect_outliers_iqr(df, column):
     """
     Detects outliers in a column using the IQR method.
@@ -32,7 +41,6 @@ def detect_outliers_iqr(df, column):
     logger.debug(f"Calculated IQR for '{column}': Q1={Q1}, Q3={Q3}, IQR={IQR}, lower_bound={lower_bound}, upper_bound={upper_bound}")
     return (df[column] < lower_bound) | (df[column] > upper_bound)
 
-@st.cache_data(show_spinner=False, ttl=3600)  # Cache data for 1 hour
 def count_outliers(df, columns):
     """
     Counts the number of outliers in specified numerical columns.
@@ -40,15 +48,22 @@ def count_outliers(df, columns):
     """
     outlier_counts = {}
     for col in columns:
-        if df[col].dtype in ['float64', 'int64']:
+        if pd.api.types.is_numeric_dtype(df[col]):
             outliers = detect_outliers_iqr(df, col)
             count = outliers.sum()
             outlier_counts[col] = count
             logger.info(f"Detected {count} outliers in column '{col}'")
+        else:
+            logger.warning(f"Column '{col}' is not numeric and was skipped for outlier detection.")
     return outlier_counts
 
-@st.cache_data(show_spinner=False, ttl=3600)  # Cache data for 1 hour
+
 def impute_missing_values(df, strategy='median'):
+    """
+    Imputes missing values in the DataFrame based on the specified strategy.
+    Numeric columns are imputed with median, mean, or zero.
+    Categorical columns are imputed with 'Unknown'.
+    """
     logger.info(f"Imputing missing values using strategy: {strategy}")
     for column in df.columns:
         if df[column].isnull().any():
@@ -70,7 +85,6 @@ def impute_missing_values(df, strategy='median'):
     logger.info("Completed missing value imputation")
     return df
 
-@st.cache_data(show_spinner=False, ttl=3600)  # Cache data for 1 hour
 def standardize_categorical_columns(df, columns, case='title'):
     """
     Standardizes specified categorical columns by stripping whitespace and adjusting case.
@@ -78,6 +92,7 @@ def standardize_categorical_columns(df, columns, case='title'):
     for col in columns:
         if col in df.columns:
             # Strip leading/trailing whitespace
+            
             df[col] = df[col].astype(str).str.strip()
             logger.debug(f"Stripped whitespace in column '{col}'")
             # Convert case
@@ -93,7 +108,6 @@ def standardize_categorical_columns(df, columns, case='title'):
     logger.info("Standardized categorical columns")
     return df
 
-@st.cache_data(show_spinner=False, ttl=3600)  # Cache data for 1 hour
 def identify_off_market(transactions_df, rent_df):
     """
     Identifies off-market properties based on the absence from sale and rent listings.
@@ -118,7 +132,6 @@ def identify_off_market(transactions_df, rent_df):
 
     return off_market
 
-@st.cache_data(show_spinner=False, ttl=3600)  # Cache data for 1 hour
 def identify_distressed(transactions_df):
     """
     Identifies distressed properties based on 'PROCEDURE_EN' or 'GROUP_EN' indicators.
@@ -141,7 +154,7 @@ def identify_distressed(transactions_df):
 
     return distressed_properties
 
-@st.cache_data(show_spinner=False, ttl=3600)  # Cache data for 1 hour
+
 def get_column_case_insensitive(df: pd.DataFrame, column_name: str):
     """
     Retrieves the actual column name from the DataFrame, ignoring case.
@@ -195,3 +208,10 @@ def load_data_from_api():
         st.error("Failed to fetch data from API. Please check the logs for more details.")
         return pd.DataFrame(), pd.DataFrame()
 
+
+def standardize_column_names(df):
+    """
+    Standardizes column names by converting to uppercase and replacing spaces with underscores.
+    """
+    df.columns = df.columns.str.upper().str.replace(' ', '_')
+    return df
