@@ -403,7 +403,7 @@ Collaboration is essential for enhancing the functionality and effectiveness of 
 
 ## License
 
-This project is licensed under the [MIT License](LICENSE).
+This project is licensed under the [Custom Non-Commercial License](LICENSE). Please refer to the LICENSE file for more details.
 
 ## Contact
 
