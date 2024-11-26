@@ -1,10 +1,11 @@
 # datapipeline/utils.py
 
 import pandas as pd
-import numpy as np
 import logging
 import streamlit as st
 import requests
+
+from datapipeline.data_converting import downcast_float, downcast_integer
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +28,6 @@ def validate_data(df, columns):
     return df
 
 
-
 def detect_outliers_iqr(df, column):
     """
     Detects outliers in a column using the IQR method.
@@ -40,6 +40,7 @@ def detect_outliers_iqr(df, column):
     upper_bound = Q3 + 1.5 * IQR
     logger.debug(f"Calculated IQR for '{column}': Q1={Q1}, Q3={Q3}, IQR={IQR}, lower_bound={lower_bound}, upper_bound={upper_bound}")
     return (df[column] < lower_bound) | (df[column] > upper_bound)
+
 
 def count_outliers(df, columns):
     """
@@ -92,7 +93,6 @@ def standardize_categorical_columns(df, columns, case='title'):
     for col in columns:
         if col in df.columns:
             # Strip leading/trailing whitespace
-            
             df[col] = df[col].astype(str).str.strip()
             logger.debug(f"Stripped whitespace in column '{col}'")
             # Convert case
@@ -108,15 +108,17 @@ def standardize_categorical_columns(df, columns, case='title'):
     logger.info("Standardized categorical columns")
     return df
 
+
+
 def identify_off_market(transactions_df, rent_df):
     """
-    Identifies off-market properties based on the absence from sale and rent listings.
+    Identifies off-market properties based on the absence from both sale and rent listings.
     """
     logger.info("Identifying off-market properties")
 
     # Properties listed for sale and rent
-    sales_properties = set(transactions_df['PROPERTY_ID'].unique())
-    rent_properties = set(rent_df['PROPERTY_ID'].unique())
+    sales_properties = set(transactions_df['PROPERTY_ID'].dropna().unique())
+    rent_properties = set(rent_df['PROPERTY_ID'].dropna().unique())
 
     # Off-market properties: present in one but not the other
     off_market_property_ids = sales_properties.symmetric_difference(rent_properties)
@@ -174,34 +176,33 @@ def get_column_case_insensitive(df: pd.DataFrame, column_name: str):
     return None
 
 
-
 @st.cache_data(show_spinner=False, ttl=3600)
 def load_data_from_api():
     logger.info("Fetching data from API")
-    
+
     transactions_api_url = "https://api.yourdomain.com/transactions"
     rent_api_url = "https://api.yourdomain.com/rent"
-    
+
     api_key = st.secrets["API_KEY"]  # Ensure this matches your secrets setup
-    
+
     headers = {
         "Authorization": f"Bearer {api_key}"
     }
-    
+
     try:
         response_transactions = requests.get(transactions_api_url, headers=headers)
         response_transactions.raise_for_status()
         transactions = pd.json_normalize(response_transactions.json())
-        
+
         response_rent = requests.get(rent_api_url, headers=headers)
         response_rent.raise_for_status()
         rent = pd.json_normalize(response_rent.json())
-        
+
         logger.info("Data fetched successfully from API")
-        
+
         transactions.columns = transactions.columns.str.strip()
         rent.columns = rent.columns.str.strip()
-        
+
         return transactions, rent
     except requests.exceptions.RequestException as e:
         logger.error(f"Error fetching data from API: {e}")
@@ -214,4 +215,98 @@ def standardize_column_names(df):
     Standardizes column names by converting to uppercase and replacing spaces with underscores.
     """
     df.columns = df.columns.str.upper().str.replace(' ', '_')
+    return df
+
+def optimize_transactions_dataframe(df):
+    """
+    Optimize the Transactions DataFrame by downcasting numerical columns and converting suitable object columns to categorical.
+    """
+    # Display initial memory usage
+    start_mem = df.memory_usage(deep=True).sum() / 1024**2
+    logger.info(f"Initial memory usage: {start_mem:.2f} MB")
+
+    # ----------------------------
+    # 1. Convert Date Columns to Datetime
+    # ----------------------------
+    date_columns = ['INSTANCE_DATE']
+    for col in date_columns:
+        if col in df.columns:
+            df[col] = pd.to_datetime(df[col], errors='coerce').dt.normalize()
+            logger.info(f"Converted and normalized '{col}' to datetime.")
+
+    # ----------------------------
+    # 2. Convert Suitable Object Columns to Categorical
+    # ----------------------------
+    categorical_columns = [
+        'TRANSACTION_NUMBER', 'GROUP_EN', 'PROCEDURE_EN', 'IS_OFFPLAN_EN',
+        'IS_FREE_HOLD_EN', 'USAGE_EN', 'AREA_EN', 'PROP_TYPE_EN',
+        'PROP_SB_TYPE_EN', 'ROOMS_EN', 'PARKING', 'NEAREST_METRO_EN',
+        'NEAREST_MALL_EN', 'NEAREST_LANDMARK_EN', 'MASTER_PROJECT_EN',
+        'PROJECT_EN'
+    ]
+
+    for col in categorical_columns:
+        if col in df.columns:
+            num_unique = df[col].nunique()
+            num_total = len(df[col])
+            if num_unique / num_total < 0.3:
+                df[col] = df[col].astype('category')
+                logger.info(f"Converted '{col}' to 'category' dtype.")
+            else:
+                logger.info(f"Skipped converting '{col}' to 'category' dtype (cardinality ratio: {num_unique / num_total:.2f}).")
+
+    # ----------------------------
+    # 3. Downcast Integer Columns
+    # ----------------------------
+    int_cols = df.select_dtypes(include=['int64', 'int32', 'uint64', 'uint32']).columns.tolist()
+    for col in int_cols:
+        if col in df.columns:
+            original_dtype = df[col].dtype
+            df[col] = downcast_integer(df[col])
+            logger.info(f"Downcasted '{col}' from {original_dtype} to {df[col].dtype}.")
+
+    # ----------------------------
+    # 4. Downcast Float Columns
+    # ----------------------------
+    float_cols = df.select_dtypes(include=['float64', 'float32', 'float16']).columns.tolist()
+    for col in float_cols:
+        if col in df.columns:
+            original_dtype = df[col].dtype
+            df[col] = downcast_float(df[col])
+            logger.info(f"Downcasted '{col}' from {original_dtype} to {df[col].dtype}.")
+
+    # ----------------------------
+    # 6. Convert Remaining Object Columns to Categorical
+    # ----------------------------
+    remaining_object_cols = df.select_dtypes(include=['object']).columns.tolist()
+    for col in remaining_object_cols:
+        num_unique = df[col].nunique()
+        num_total = len(df[col])
+        if num_unique / num_total < 0.3:
+            df[col] = df[col].astype('category')
+            logger.info(f"Converted '{col}' to 'category' dtype.")
+        else:
+            logger.info(f"Skipped converting '{col}' to 'category' dtype (cardinality ratio: {num_unique / num_total:.2f}).")
+
+    # ----------------------------
+    # 7. Remove Unused Categories
+    # ----------------------------
+    categorical_cols = df.select_dtypes(['category']).columns.tolist()
+    for col in categorical_cols:
+        df[col] = df[col].cat.remove_unused_categories()
+        logger.info(f"Removed unused categories from '{col}'.")
+
+    # ----------------------------
+    # 8. Reset Index to RangeIndex
+    # ----------------------------
+    df.reset_index(drop=True, inplace=True)
+    logger.info("Reset index to RangeIndex.")
+
+    # ----------------------------
+    # 9. Display Final Memory Usage
+    # ----------------------------
+    end_mem = df.memory_usage(deep=True).sum() / 1024**2
+    logger.info(f"Final memory usage: {end_mem:.2f} MB")
+    logger.info(f"Decreased by {(start_mem - end_mem) / start_mem * 100:.1f}%")
+
     return df
