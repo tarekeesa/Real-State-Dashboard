@@ -46,7 +46,7 @@ st.set_page_config(
 # -----------------------------
 
 st.sidebar.header("Data Source Selection")
-data_source = st.sidebar.selectbox("Select Data Source", ["Select Data Source", "Parquet", "API"])
+data_source = st.sidebar.selectbox("Select Data Source", ["Select Data Source", "Preloaded", "LiveAPI"])
 
 # Check if a valid data source is selected
 if data_source == "Select Data Source":
@@ -60,9 +60,9 @@ if data_source == "Select Data Source":
 # https://drive.google.com/file/d/1FkX2cPwvEPVZue72vEJigvFBMf-XyypG/view?usp=sharing
 
 @st.cache_data(show_spinner=False, ttl=3600, max_entries=10)
-def load_data(source='Parquet'):
+def load_data(source='Preloaded'):
     logger.info(f"Loading data from {source}")
-    if source == 'Parquet':
+    if source == 'Preloaded':
         try:
             # Ensure the 'data' directory exists
             os.makedirs('data', exist_ok=True)
@@ -105,7 +105,7 @@ def load_data(source='Parquet'):
             st.error("Failed to load data from Google Drive Parquet files. Please check the logs for more details.")
             transactions = pd.DataFrame()
             rent = pd.DataFrame()
-    elif source == 'API':
+    elif source == 'LiveAPI':
         transactions, rent = load_data_from_api()
     else:
         logger.warning("Unknown data source selected")
@@ -136,7 +136,7 @@ with st.spinner("Loading data, please wait..."):
 # -----------------------------
 # Manual Data Refresh
 # -----------------------------
-if data_source == "API":
+if data_source == "LiveAPI":
     if st.sidebar.button("Refresh Data"):
         # Clear the cache by calling the load_data function with a different argument
         load_data.clear()
