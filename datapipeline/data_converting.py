@@ -1,6 +1,5 @@
 import pandas as pd
 import numpy as np
-import gc
 
 # Define downcasting functions
 def downcast_integer(col):
@@ -123,12 +122,6 @@ def optimize_transactions_dataframe(df):
             print(f"Downcasted '{col}' from {original_dtype} to {df[col].dtype}.")
     
     # ----------------------------
-    # 5. Handle Specific Columns if Needed
-    # ----------------------------
-    # Example: 'PROCEDURE_AREA' has 830 missing values
-    # Already handled by downcasting functions which preserve NaNs
-    
-    # ----------------------------
     # 6. Convert Remaining Object Columns to Categorical
     # ----------------------------
     remaining_object_cols = df.select_dtypes(include=['object']).columns.tolist()
@@ -220,7 +213,6 @@ def optimize_dataframe(df):
             print(f"Downcasted '{col}' from {original_dtype} to {df[col].dtype}.")
     
     # 6. Handle missing values in specific columns if necessary
-    # Example: Convert 'ANNUAL_AMOUNT' to float16 if suitable
     if 'ANNUAL_AMOUNT' in df.columns:
         original_dtype = df['ANNUAL_AMOUNT'].dtype
         df['ANNUAL_AMOUNT'] = downcast_float(df['ANNUAL_AMOUNT'])
@@ -248,7 +240,6 @@ def optimize_dataframe(df):
     print("Reset index to RangeIndex.")
     
     # 10. Drop unnecessary columns (if any)
-    # Example: Drop 'MASTER_PROJECT_EN' if it's not needed
     columns_to_drop = ['MASTER_PROJECT_EN']  # Add any other columns you wish to drop
     if columns_to_drop:
         df.drop(columns=columns_to_drop, inplace=True)
