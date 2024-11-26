@@ -38,6 +38,8 @@ Leveraging the capabilities of **Streamlit**, **Plotly**, and advanced data proc
 - **Enhanced Efficiency:** Swiftly perform complex calculations and gain insights that enhance your decision-making process in the real estate market.
 
 ## Demo
+*Click here to see the Demo*
+![Demo](https://realstatedubia.streamlit.app/)
 
 ![Dashboard Screenshot](images/dashboard.png)
 
